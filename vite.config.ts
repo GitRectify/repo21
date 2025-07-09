@@ -18,26 +18,23 @@ export default defineConfig({
     })
   ],
   build: {
-    rollupOptions: {
-      input: {
-        popup: path.resolve(__dirname, 'src/popup/popup.html'),
-        options: path.resolve(__dirname, 'src/options/options.html')
-        // ❌ Remove background and content from here
-      }
-    },
     outDir: 'dist',
     emptyOutDir: true,
     target: 'es2020',
     minify: false,
     sourcemap: false,
-    // ✅ This enables .ts entry files (like background, content)
-    lib: {
-      entry: {
+    rollupOptions: {
+      input: {
+        popup: path.resolve(__dirname, 'popup.html'),
+        options: path.resolve(__dirname, 'options.html'),
         background: path.resolve(__dirname, 'src/background/index.ts'),
         content: path.resolve(__dirname, 'src/content/index.tsx')
       },
-      formats: ['es'],
-      fileName: (_format, entryName) => `${entryName}.js`
+      output: {
+        entryFileNames: '[name].js',
+        chunkFileNames: '[name].js',
+        assetFileNames: '[name][extname]'
+      }
     }
   }
 });
