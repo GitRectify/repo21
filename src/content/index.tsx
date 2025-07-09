@@ -1,0 +1,1 @@
+console.log("SendShield content script loaded.")
