@@ -1,87 +1,47 @@
-console.log('[SendShield] Content script loaded');
+console.log("[SendShield] Content script loaded");
 
-const DEFAULT_DELAY_SECONDS = 60;
+function waitForGmailCompose(callback: () => void) {
+  const CHECK_INTERVAL = 1000;
+  const MAX_RETRIES = 30;
+  let retries = 0;
 
-// Utility: Find all visible send buttons in Gmail
-function getSendButtons(): HTMLElement[] {
-  return Array.from(document.querySelectorAll('[aria-label="Send"]'))
-    .filter((el) => el instanceof HTMLElement && (el as HTMLElement).offsetParent !== null) as HTMLElement[];
-}
-
-// Show delay overlay UI
-function showDelayShield(delaySeconds: number, cancelCallback: () => void) {
-  const shield = document.createElement('div');
-  shield.innerText = `Delaying send (${delaySeconds}s) – Click to cancel`;
-  shield.style.cssText = `
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background: #1f1f1f;
-    color: white;
-    padding: 10px 16px;
-    border-radius: 12px;
-    font-family: Inter, sans-serif;
-    font-size: 14px;
-    z-index: 9999;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    cursor: pointer;
-    transition: opacity 0.2s ease-in-out;
-  `;
-
-  document.body.appendChild(shield);
-
-  shield.addEventListener('click', () => {
-    cancelCallback();
-    shield.innerText = 'Send cancelled';
-    setTimeout(() => document.body.removeChild(shield), 2000);
-  });
-
-  return shield;
-}
-
-// Intercept send button clicks globally
-function interceptAllSendButtons(delaySeconds: number = DEFAULT_DELAY_SECONDS) {
-  document.addEventListener('click', (e) => {
-    const target = e.target as HTMLElement;
-    if (!target) return;
-    // Check if the click is on a send button or its child
-    const sendBtn = target.closest('[aria-label="Send"]') as HTMLElement | null;
-    if (sendBtn && sendBtn.offsetParent !== null) {
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-      console.log('[SendShield] Intercepted Send');
-
-      // Show delay UI
-      const shield = showDelayShield(delaySeconds, cancelSend);
-      let cancelled = false;
-      const timer = setTimeout(() => {
-        if (!cancelled) {
-          document.body.removeChild(shield);
-          console.log('[SendShield] Delay complete. Sending now...');
-          // Dispatch a new click event to the button
-          sendBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-        }
-      }, delaySeconds * 1000);
-
-      function cancelSend() {
-        cancelled = true;
-        clearTimeout(timer);
-        console.log('[SendShield] Send cancelled by user.');
+  const interval = setInterval(() => {
+    const composeButton = document.querySelector("div[gh='cm']"); // Gmail's compose button
+    if (composeButton) {
+      clearInterval(interval);
+      console.log("[SendShield] Compose button detected. Initializing...");
+      callback();
+    } else {
+      retries++;
+      if (retries > MAX_RETRIES) {
+        clearInterval(interval);
+        console.warn("[SendShield] Compose button not found. Giving up.");
       }
     }
-  }, true); // Use capture phase to intercept before Gmail
+  }, CHECK_INTERVAL);
 }
 
-// Watch for DOM changes to handle dynamic Gmail UI
-function observeGmailUI() {
-  const observer = new MutationObserver(() => {
-    // This will keep the event listener active for new buttons
-    // (No-op, as we use event delegation)
+function initializeSendShieldFeatures() {
+  // Your logic to inject UI, delay send, hook into Gmail compose, etc.
+  console.log("[SendShield] Initialized!");
+  // Example: add listener to compose button
+  const composeButton = document.querySelector("div[gh='cm']");
+  composeButton?.addEventListener("click", () => {
+    console.log("[SendShield] Compose clicked");
+    // Later hook into email send
   });
-  observer.observe(document.body, { childList: true, subtree: true });
 }
 
-// Bootstrap
-interceptAllSendButtons(DEFAULT_DELAY_SECONDS);
-observeGmailUI();
+// Gmail is SPA — watch URL changes
+let lastUrl = location.href;
+new MutationObserver(() => {
+  const currentUrl = location.href;
+  if (currentUrl !== lastUrl) {
+    lastUrl = currentUrl;
+    console.log("[SendShield] URL changed to", currentUrl);
+    waitForGmailCompose(initializeSendShieldFeatures);
+  }
+}).observe(document, { subtree: true, childList: true });
+
+// Run on initial load
+waitForGmailCompose(initializeSendShieldFeatures);
